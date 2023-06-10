@@ -1,11 +1,10 @@
 import "dotenv/config";
-
-import { TwitterApi } from "twitter-api-v2";
 import { ethers } from "ethers";
-import { abi } from "./abi";
-import { schedule } from "node-cron";
+import { TwitterApi } from "twitter-api-v2";
 import mongoose from "mongoose";
+import { schedule } from "node-cron";
 import Challenger from "./models/challenger";
+import { abi } from "./abi";
 
 const {
   MONGO_URI,
@@ -18,27 +17,29 @@ const {
   BEARER_TOKEN,
 } = process.env;
 
-const client = new TwitterApi({
+const twitterClient = new TwitterApi({
   appKey: API_KEY,
   appSecret: API_SECRET,
   accessToken: ACCESS_TOKEN,
   accessSecret: ACCESS_SECRET,
-});
-const bearer = new TwitterApi(BEARER_TOKEN);
-const twitterClient = client.readWrite;
-const twitterBearer = bearer.readOnly;
+}).readWrite;
+
+const twitterBearer = new TwitterApi(BEARER_TOKEN).readOnly;
 
 const contractAddress = CONTRACT_ADDRESS || "";
 
-// Handle ChallengeSolved events emitted by the NFT contract
-async function handleChallengeSolvedEvents() {
-  await mongoose
-    .connect(MONGO_URI)
-    .then(() => {
-      console.log("CONNTECTED TO DATABASE");
-    })
-    .catch(console.error);
+// Connect to MongoDB
+mongoose
+  .connect(MONGO_URI)
+  .then(() => {
+    console.log("Connected to database");
+  })
+  .catch((error) => {
+    console.error("Error connecting to database:", error);
+  });
 
+// Start processing ChallengeSolved events
+async function startChallengeSolvedEventProcessing() {
   const providerUrl = PROVIDER_URI || "";
   const provider = new ethers.JsonRpcProvider(providerUrl);
   const contract = new ethers.Contract(contractAddress, abi, provider);
@@ -47,15 +48,14 @@ async function handleChallengeSolvedEvents() {
 
   let latestBlockNumber = await provider.getBlockNumber();
   let currentBlockNumber = latestBlockNumber - 1;
-  // get max blockNumber from Challanger colection
-  await Challenger.find()
+
+  // Get the max blockNumber from the Challenger collection
+  const maxBlockNumber = await Challenger.findOne()
     .sort({ blockNumber: -1 })
-    .limit(1)
-    .then((res) => {
-      if (res.length > 0) {
-        currentBlockNumber = res[0].blockNumber + 1;
-      }
-    })
+    .select("blockNumber")
+    .lean()
+    .exec()
+    .then((res) => res?.blockNumber ?? currentBlockNumber)
     .catch(console.error);
 
   // Process all ChallengeSolved events emitted since the last processed block
@@ -64,10 +64,14 @@ async function handleChallengeSolvedEvents() {
       latestBlockNumber = await provider.getBlockNumber(); // Get the latest block number
 
       if (latestBlockNumber > currentBlockNumber) {
-        console.log(`Range: ${currentBlockNumber} to ${latestBlockNumber}, `);
+        console.log(
+          `Processing events from block ${
+            currentBlockNumber + 1
+          } to ${latestBlockNumber}`
+        );
         const events = await contract.queryFilter(
           filter,
-          currentBlockNumber,
+          currentBlockNumber + 1,
           latestBlockNumber
         );
 
@@ -78,32 +82,31 @@ async function handleChallengeSolvedEvents() {
             event.topics
           );
           const tweet = `Congratulations @${twitterHandle} for solving (address: ${solver}) the challenge ${challenge}`;
-          console.log(tweet);
+
           await twitterClient.v2.tweet(tweet);
+          console.log(tweet);
 
           await Challenger.create({
             twitterHandle,
             solver,
             challenge,
             blockNumber: event.blockNumber,
-          })
-            .then(() => {
-              console.log("saved to database");
-            })
-            .catch(console.error);
+          });
+          console.log(
+            `Saved event from block ${event.blockNumber} to database`
+          );
         }
-        currentBlockNumber = latestBlockNumber + 1; // set current block number for next processing
+        currentBlockNumber = latestBlockNumber; // set current block number for next processing
       }
     } catch (error) {
       console.error("Error processing ChallengeSolved events:", error);
     }
   }
 
-  // Schedule the processing of ChallengeSolved events evrey 15 seconds
+  // Schedule the processing of ChallengeSolved events every 15 seconds
   schedule("*/15 * * * * *", async () => {
     await processChallengeSolvedEvents();
   }).start();
 }
 
-// Start processing ChallengeSolved events
-handleChallengeSolvedEvents();
+startChallengeSolvedEventProcessing();
