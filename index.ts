@@ -80,7 +80,7 @@ async function startChallengeSolvedEventProcessing() {
             event.data,
             event.topics
           );
-          const tweet = `Congratulations @${twitterHandle} for solving (address: ${solver}) the challenge ${challenge}`;
+          const tweet = `Congratulations @${twitterHandle} for solving (address: ${solver}) the challenge ${challenge}, Block Number: ${event.blockNumber}`;
 
           await twitterClient.v2.tweet(tweet);
           console.log(tweet);
