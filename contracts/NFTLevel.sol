@@ -18,10 +18,9 @@ contract TestCertificate is ERC721, Ownable {
     constructor() ERC721("TestCyf", "CYF") { }
 
     //Mint certificate button
-    function mint() external {
+    function mint(string memory twitterHandle) external {
         uint256 tokenId = _tokenIdCounter.current();
         _tokenIdCounter.increment();
-        string memory twitterHandle = "bozaetest";
         emit ChallengeSolved(msg.sender, msg.sender, twitterHandle);
         _safeMint(msg.sender, tokenId); 
     }
