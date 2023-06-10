@@ -13,7 +13,7 @@ const contractAddress = process.env.CONTRACT_ADDRESS || "0xE0ffeddD66245C38f1376
 
 // Handle GET requests to the root URL
 server.get("/", async (req: Request, res: Response) => {
-  await twitterClient.v2.tweet("deneme2");
+  await twitterClient.v2.tweet("Hello world!");
   res.send("Express + TypeScript Server");
 });
 
@@ -29,7 +29,7 @@ async function handleChallengeSolvedEvents() {
   const provider = new ethers.JsonRpcProvider(providerUrl);
   const contract = new ethers.Contract(contractAddress, abi, provider);
   const filter = contract.filters.ChallengeSolved(null, null, null);
-  let latestBlockNumber = 22891538;
+  let latestBlockNumber =  await provider.getBlockNumber();
   const iface = new ethers.Interface(abi);
 
   // Process all ChallengeSolved events emitted since the last processed block
@@ -40,6 +40,7 @@ async function handleChallengeSolvedEvents() {
         latestBlockNumber,
         "latest"
       );
+      latestBlockNumber = await provider.getBlockNumber();
 
       for (const event of events) {
         const [solver, challenge, twitterHandle] = iface.decodeEventLog(
@@ -48,8 +49,9 @@ async function handleChallengeSolvedEvents() {
           event.topics
         );
         const tweet = `Congratulations @${twitterHandle} for solving (solver: ${solver}) the challenge ${challenge} Block Number:${event.blockNumber}`;
-        await twitterClient.v2.tweet(tweet);
-        latestBlockNumber = event.blockNumber;
+        console.log(tweet);
+        //await twitterClient.v2.tweet(tweet);
+        
       }
     } catch (error) {
       console.error('Error processing ChallengeSolved events:', error);
