@@ -1,71 +1,107 @@
-import express, { Express, Request, Response } from "express";
-import dotenv from "dotenv";
-import { twitterClient } from "./twitterClient";
+import "dotenv/config";
+
+import { TwitterApi } from "twitter-api-v2";
 import { ethers } from "ethers";
 import { abi } from "./abi";
 import { schedule } from "node-cron";
 import mongoose from "mongoose";
+import Challenger from "./models/challenger";
 
-dotenv.config();
-const { PORT ,MONGO_URI, INFURA_API_KEY, CONTRACT_ADDRESS } = process.env;
+const {
+  MONGO_URI,
+  PROVIDER_URI,
+  CONTRACT_ADDRESS,
+  API_KEY,
+  API_SECRET,
+  ACCESS_TOKEN,
+  ACCESS_SECRET,
+  BEARER_TOKEN,
+} = process.env;
 
-const server: Express = express();
-const port = PORT || 3000;
-const contractAddress = CONTRACT_ADDRESS || "0xE0ffeddD66245C38f1376F9255CEE57eAdfe790c";
-
-// Handle GET requests to the root URL
-server.get("/", async (req: Request, res: Response) => {
-  await twitterClient.v2.tweet("Hello world!");
-  res.send("Express + TypeScript Server");
+const client = new TwitterApi({
+  appKey: API_KEY,
+  appSecret: API_SECRET,
+  accessToken: ACCESS_TOKEN,
+  accessSecret: ACCESS_SECRET,
 });
+const bearer = new TwitterApi(BEARER_TOKEN);
+const twitterClient = client.readWrite;
+const twitterBearer = bearer.readOnly;
 
-// Start the server
-server.listen(port, () => {
-  console.log(`⚡️[server]: Server is running at http://localhost:${port}`);
-});
+const contractAddress = CONTRACT_ADDRESS || "";
 
 // Handle ChallengeSolved events emitted by the NFT contract
 async function handleChallengeSolvedEvents() {
-  await mongoose.connect(MONGO_URI).
-  then(() => { console.log("CONNTECTED TO DATABASE"); })
-  .catch(console.error);
+  await mongoose
+    .connect(MONGO_URI)
+    .then(() => {
+      console.log("CONNTECTED TO DATABASE");
+    })
+    .catch(console.error);
 
-  const providerUrl =
-    "https://avalanche-fuji.infura.io/v3/" + INFURA_API_KEY;
+  const providerUrl = PROVIDER_URI || "";
   const provider = new ethers.JsonRpcProvider(providerUrl);
   const contract = new ethers.Contract(contractAddress, abi, provider);
   const filter = contract.filters.ChallengeSolved(null, null, null);
-  let latestBlockNumber =  await provider.getBlockNumber();
   const iface = new ethers.Interface(abi);
+
+  let latestBlockNumber = await provider.getBlockNumber();
+  let currentBlockNumber = latestBlockNumber - 1;
+  // get max blockNumber from Challanger colection
+  await Challenger.find()
+    .sort({ blockNumber: -1 })
+    .limit(1)
+    .then((res) => {
+      if (res.length > 0) {
+        currentBlockNumber = res[0].blockNumber + 1;
+      }
+    })
+    .catch(console.error);
 
   // Process all ChallengeSolved events emitted since the last processed block
   async function processChallengeSolvedEvents() {
     try {
-      const events = await contract.queryFilter(
-        filter,
-        latestBlockNumber,
-        "latest"
-      );
-      latestBlockNumber = await provider.getBlockNumber();
+      latestBlockNumber = await provider.getBlockNumber(); // Get the latest block number
 
-      for (const event of events) {
-        const [solver, challenge, twitterHandle] = iface.decodeEventLog(
-          "ChallengeSolved",
-          event.data,
-          event.topics
+      if (latestBlockNumber > currentBlockNumber) {
+        console.log(`Range: ${currentBlockNumber} to ${latestBlockNumber}, `);
+        const events = await contract.queryFilter(
+          filter,
+          currentBlockNumber,
+          latestBlockNumber
         );
-        const tweet = `Congratulations @${twitterHandle} for solving (solver: ${solver}) the challenge ${challenge} Block Number:${event.blockNumber}`;
-        console.log(tweet);
-        //await twitterClient.v2.tweet(tweet);
-        
+
+        currentBlockNumber = latestBlockNumber + 1; // set current block number for next processing
+
+        for (const event of events) {
+          const [solver, challenge, twitterHandle] = iface.decodeEventLog(
+            "ChallengeSolved",
+            event.data,
+            event.topics
+          );
+          const tweet = `Congratulations @${twitterHandle} for solving (solver: ${solver}) the challenge ${challenge} Block Number:${event.blockNumber}`;
+          console.log(tweet);
+          await twitterClient.v2.tweet(tweet);
+
+          await Challenger.create({
+            twitterHandle,
+            solver,
+            challenge,
+            blockNumber: event.blockNumber,
+          })
+            .then(() => {
+              console.log("saved to database");
+            })
+            .catch(console.error);
+        }
       }
     } catch (error) {
-      console.error('Error processing ChallengeSolved events:', error);
+      console.error("Error processing ChallengeSolved events:", error);
     }
   }
 
-  // Schedule the processing of ChallengeSolved events every 5 seconds
-  schedule("*/5 * * * * *", async () => {
+  // Schedule the processing of ChallengeSolved events every minutes
+  schedule("* * * * *", async () => {
     await processChallengeSolvedEvents();
   }).start();
 }
