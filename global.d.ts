@@ -6,7 +6,8 @@ namespace NodeJS {
         ACCESS_SECRET: string;
         BEARER_TOKEN: string;
         APP_ID: string;
-        INFURA_API_KEY: string;
+        PROVIDER_URI: string;
         MONGO_URI: string;
+        CONTRACT_ADDRESS: string;
   }
 }
