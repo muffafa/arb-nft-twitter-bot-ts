@@ -50,13 +50,12 @@ async function startChallengeSolvedEventProcessing() {
   let currentBlockNumber = latestBlockNumber - 1;
 
   // Get the max blockNumber from the Challenger collection
-  const maxBlockNumber = await Challenger.findOne()
+  currentBlockNumber = await Challenger.findOne()
     .sort({ blockNumber: -1 })
     .select("blockNumber")
     .lean()
     .exec()
-    .then((res) => res?.blockNumber ?? currentBlockNumber)
-    .catch(console.error);
+    .then((res) => res?.blockNumber ?? currentBlockNumber);
 
   // Process all ChallengeSolved events emitted since the last processed block
   async function processChallengeSolvedEvents() {
