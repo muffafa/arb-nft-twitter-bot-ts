@@ -4,12 +4,14 @@ import { twitterClient } from "./twitterClient";
 import { ethers } from "ethers";
 import { abi } from "./abi";
 import { schedule } from "node-cron";
+import mongoose from "mongoose";
 
 dotenv.config();
+const { PORT ,MONGO_URI, INFURA_API_KEY, CONTRACT_ADDRESS } = process.env;
 
 const server: Express = express();
-const port = process.env.PORT || 3000;
-const contractAddress = process.env.CONTRACT_ADDRESS || "0xE0ffeddD66245C38f1376F9255CEE57eAdfe790c";
+const port = PORT || 3000;
+const contractAddress = CONTRACT_ADDRESS || "0xE0ffeddD66245C38f1376F9255CEE57eAdfe790c";
 
 // Handle GET requests to the root URL
 server.get("/", async (req: Request, res: Response) => {
@@ -24,8 +26,12 @@ server.listen(port, () => {
 
 // Handle ChallengeSolved events emitted by the NFT contract
 async function handleChallengeSolvedEvents() {
+  await mongoose.connect(MONGO_URI).
+  then(() => { console.log("CONNTECTED TO DATABASE"); })
+  .catch(console.error);
+
   const providerUrl =
-    "https://avalanche-fuji.infura.io/v3/" + process.env.INFURA_API_KEY;
+    "https://avalanche-fuji.infura.io/v3/" + INFURA_API_KEY;
   const provider = new ethers.JsonRpcProvider(providerUrl);
   const contract = new ethers.Contract(contractAddress, abi, provider);
   const filter = contract.filters.ChallengeSolved(null, null, null);

@@ -7,5 +7,6 @@ namespace NodeJS {
         BEARER_TOKEN: string;
         APP_ID: string;
         INFURA_API_KEY: string;
+        MONGO_URI: string;
   }
 }
