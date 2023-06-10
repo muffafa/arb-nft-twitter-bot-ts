@@ -71,8 +71,6 @@ async function handleChallengeSolvedEvents() {
           latestBlockNumber
         );
 
-        currentBlockNumber = latestBlockNumber + 1; // set current block number for next processing
-
         for (const event of events) {
           const [solver, challenge, twitterHandle] = iface.decodeEventLog(
             "ChallengeSolved",
@@ -94,14 +92,15 @@ async function handleChallengeSolvedEvents() {
             })
             .catch(console.error);
         }
+        currentBlockNumber = latestBlockNumber + 1; // set current block number for next processing
       }
     } catch (error) {
       console.error("Error processing ChallengeSolved events:", error);
     }
   }
 
-  // Schedule the processing of ChallengeSolved events every minutes
-  schedule("* * * * *", async () => {
+  // Schedule the processing of ChallengeSolved events evrey 15 seconds
+  schedule("*/15 * * * * *", async () => {
     await processChallengeSolvedEvents();
   }).start();
 }
