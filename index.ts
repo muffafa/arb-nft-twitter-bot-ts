@@ -85,19 +85,22 @@ async function startChallengeSolvedEventProcessing() {
           if (handle[0] === "@") {
             handle = twitterHandle.substring(1); 
           }
+          handle = handle || `""`;
+          
+          const tweet = `Congratulations @${handle}\n\nYour address:\n${solver}\n\nThe challenge address:\n${challenge}\n\nBlock Number: ${event.blockNumber}`;
+          
+          console.log("--------------------");
+          console.log(tweet);
+          console.log("--------------------");
 
-          const tweet = `Congratulations @${handle} for solving your address:\n${solver}) the challenge address:\n${challenge}, \nBlock Number: ${event.blockNumber}`;
           await twitterClient.v2.tweet(tweet);
 
           await Challenger.create({
-            twitterHandle,
+            twitterHandle: handle,
             solver,
             challenge,
             blockNumber: event.blockNumber,
-          });
-          console.log(
-            `Saved event from block ${event.blockNumber} to database`
-          );
+          }).then((res) => console.log("")).catch((err) => console.log(err));
           
         }
         currentBlockNumber = latestBlockNumber; // set current block number for next processing
@@ -107,8 +110,8 @@ async function startChallengeSolvedEventProcessing() {
     }
   }
 
-  // Schedule the processing of ChallengeSolved events every 5 minutes
-  schedule("*/5 * * * * *", async () => {
+  // Schedule the processing of ChallengeSolved events every 2 minutes
+  schedule("*/2 * * * *", async () => {
     await processChallengeSolvedEvents();
   }).start();
 }
