@@ -87,7 +87,7 @@ async function startChallengeSolvedEventProcessing() {
           }
           handle = handle || `""`;
           
-          const tweet = `Congratulations @${handle}\n\nYour address:\n${solver}\n\nThe challenge address:\n${challenge}\n\nBlock Number: ${event.blockNumber}`;
+          const tweet = `🎉 Congratulations @${handle}\n\n👀 Your address:\n${solver}\n\n🧩 The challenge address:\n${challenge}\n\n📦 Block Number: ${event.blockNumber}`;
           
           console.log("--------------------");
           console.log(tweet);
