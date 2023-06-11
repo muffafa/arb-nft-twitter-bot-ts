@@ -47,7 +47,7 @@ async function startChallengeSolvedEventProcessing() {
   const iface = new ethers.Interface(abi);
 
   let latestBlockNumber = await provider.getBlockNumber();
-  let currentBlockNumber = latestBlockNumber - 1;
+  let currentBlockNumber = 97795210 ;
 
   // Get the max blockNumber from the Challenger collection
   currentBlockNumber = await Challenger.findOne()
@@ -80,9 +80,9 @@ async function startChallengeSolvedEventProcessing() {
             event.data,
             event.topics
           );
-          const tweet = `Congratulations @${twitterHandle} for solving (address: ${solver}) the challenge ${challenge}, Block Number: ${event.blockNumber}`;
+          const tweet = `Congratulations @${twitterHandle} for solving your address:\n${solver}) the challenge address:\n${challenge}, \nBlock Number: ${event.blockNumber}`;
 
-          await twitterClient.v2.tweet(tweet);
+          //await twitterClient.v2.tweet(tweet);
           console.log(tweet);
 
           await Challenger.create({
@@ -94,6 +94,7 @@ async function startChallengeSolvedEventProcessing() {
           console.log(
             `Saved event from block ${event.blockNumber} to database`
           );
+          
         }
         currentBlockNumber = latestBlockNumber; // set current block number for next processing
       }
@@ -102,8 +103,8 @@ async function startChallengeSolvedEventProcessing() {
     }
   }
 
-  // Schedule the processing of ChallengeSolved events every 15 seconds
-  schedule("*/15 * * * * *", async () => {
+  // Schedule the processing of ChallengeSolved events every 5 minutes
+  schedule("* * * * *", async () => {
     await processChallengeSolvedEvents();
   }).start();
 }
